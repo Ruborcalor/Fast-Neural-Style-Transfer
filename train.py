@@ -28,6 +28,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint_interval", type=int, default=2000, help="Batches between saving model")
     parser.add_argument("--sample_interval", type=int, default=1000, help="Batches between saving image samples")
     args = parser.parse_args()
+    print("Style size:", args.style_size)
 
     style_name = args.style_image.split("/")[-1].split(".")[0]
     os.makedirs(f"images/outputs/{style_name}-training", exist_ok=True)
@@ -61,8 +62,12 @@ if __name__ == "__main__":
 
     # Sample 8 images for visual evaluation of the model
     image_samples = []
-    for path in random.sample(glob.glob(f"{args.dataset_path}/*/*.png"), 8):
-        image_samples += [style_transform(args.image_size)(Image.open(path))]
+    print("Path loop")
+    for path in random.sample(glob.glob(f"{args.dataset_path}/*/*.jpg"), 8):
+        print(path)
+        next_image = [style_transform(args.image_size)(Image.open(path))]
+        print(next_image[0].shape)
+        image_samples += next_image
     image_samples = torch.stack(image_samples)
 
     def save_sample(batches_done):
