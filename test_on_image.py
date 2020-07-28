@@ -36,4 +36,4 @@ if __name__ == "__main__":
 
     # Save image
     fn = args.image_path.split("/")[-1]
-    save_image(stylized_image, f"images/outputs/stylized-{fn}")
+    save_image(stylized_image, f"images/outputs/stylized-{args.checkpoint_model.split('/')[-1][:-4]}-{fn}")
