@@ -29,7 +29,7 @@ def train_transform(image_size):
     """ Transforms for training images """
     transform = transforms.Compose(
         [
-            transforms.Resize(int(image_size * 1.15)),
+            transforms.Resize((int(image_size * 1.15), int(image_size * 1.15))),
             transforms.RandomCrop(image_size),
             transforms.ToTensor(),
             transforms.Normalize(mean, std),
