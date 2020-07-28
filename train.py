@@ -51,6 +51,7 @@ if __name__ == "__main__":
     # Define optimizer and loss
     optimizer = Adam(transformer.parameters(), args.lr)
     l2_loss = torch.nn.MSELoss().to(device)
+    # l2_loss = torch.nn.MSELoss().to(device)
 
     # Load style image
     style = style_transform(args.style_size)(Image.open(args.style_image))
@@ -59,6 +60,7 @@ if __name__ == "__main__":
     # Extract style features
     features_style = vgg(style)
     gram_style = [gram_matrix(y) for y in features_style]
+
 
     # Sample 8 images for visual evaluation of the model
     image_samples = []
@@ -96,39 +98,52 @@ if __name__ == "__main__":
 
             # Compute style loss as MSE between gram matrices
             style_loss = 0
+            problem = False
             for ft_y, gm_s in zip(features_transformed, gram_style):
                 gm_y = gram_matrix(ft_y)
-                style_loss += l2_loss(gm_y, gm_s[: images.size(0), :, :])
-            style_loss *= args.lambda_style
+                adding_loss = l2_loss(gm_y, gm_s[: images.size(0), :, :])
 
-            total_loss = content_loss + style_loss
-            total_loss.backward()
-            optimizer.step()
+                safe_tensor = torch.where(torch.isnan(adding_loss), torch.zeros_like(adding_loss), adding_loss)
+                if (safe_tensor != adding_loss):
+                    print("Problem")
+                    problem = True
 
-            epoch_metrics["content"] += [content_loss.item()]
-            epoch_metrics["style"] += [style_loss.item()]
-            epoch_metrics["total"] += [total_loss.item()]
+                style_loss += safe_tensor
 
-            sys.stdout.write(
-                "\r[Epoch %d/%d] [Batch %d/%d] [Content: %.2f (%.2f) Style: %.2f (%.2f) Total: %.2f (%.2f)]"
-                % (
-                    epoch + 1,
-                    args.epochs,
-                    batch_i,
-                    len(train_dataset),
-                    content_loss.item(),
-                    np.mean(epoch_metrics["content"]),
-                    style_loss.item(),
-                    np.mean(epoch_metrics["style"]),
-                    total_loss.item(),
-                    np.mean(epoch_metrics["total"]),
-                )
-            )
+            if (not problem):
 
-            batches_done = epoch * len(dataloader) + batch_i + 1
-            if batches_done % args.sample_interval == 0:
-                save_sample(batches_done)
+                style_loss *= args.lambda_style
 
-            if args.checkpoint_interval > 0 and batches_done % args.checkpoint_interval == 0:
-                style_name = os.path.basename(args.style_image).split(".")[0]
-                torch.save(transformer.state_dict(), f"checkpoints/{style_name}_{batches_done}.pth")
+                total_loss = content_loss + style_loss
+                total_loss.backward()
+                optimizer.step()
+
+                epoch_metrics["content"] += [content_loss.item()]
+                epoch_metrics["style"] += [style_loss.item()]
+                epoch_metrics["total"] += [total_loss.item()]
+
+                print(f"[Epoch {epoch + 1}/{args.epochs}] [Batch {batch_i}/{len(train_dataset) / args.batch_size}] [Content: {content_loss.item()} ({np.mean(epoch_metrics['content'])}) Style: {style_loss.item()} ({np.mean(epoch_metrics['style'])}) Total: {total_loss.item()} ({np.mean(epoch_metrics['total'])})]", flush=True)
+
+                # sys.stdout.write(
+                #     "\r[Epoch %d/%d] [Batch %d/%d] [Content: %.2f (%.2f) Style: %.2f (%.2f) Total: %.2f (%.2f)]"
+                #     % (
+                #         epoch + 1,
+                #         args.epochs,
+                #         batch_i,
+                #         len(train_dataset),
+                #         content_loss.item(),
+                #         np.mean(epoch_metrics["content"]),
+                #         style_loss.item(),
+                #         np.mean(epoch_metrics["style"]),
+                #         total_loss.item(),
+                #         np.mean(epoch_metrics["total"]),
+                #     )
+                # )
+
+                batches_done = epoch * len(dataloader) + batch_i + 1
+                if batches_done % args.sample_interval == 0:
+                    save_sample(batches_done)
+
+                if args.checkpoint_interval > 0 and batches_done % args.checkpoint_interval == 0:
+                    style_name = os.path.basename(args.style_image).split(".")[0]
+                    torch.save(transformer.state_dict(), f"checkpoints/{style_name}_{batches_done}.pth")
